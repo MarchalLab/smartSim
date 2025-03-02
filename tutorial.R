@@ -1,13 +1,14 @@
 
-#install from github
-# library(devtools)
-# install_github("mhecke/smartSim.git")
+#set path to smartSim
+ssPath <- "path/to/smartSim"
 
 #install from source
-install.packages("~/Documents/smartSim", repos = NULL, type="source")
+install.packages(ssPath, repos = NULL, type="source")
 
 library(smartSim)
 library(reticulate)
+library(R.utils)
+setwd(ssPath)
 
 # use smartSim conda environment
 use_condaenv("smartSim")
@@ -35,6 +36,13 @@ tag = "ATTGCGCAATG"   #Smart-seq3 tag used to identify UMI containing reads
 #for reproducibility
 set.seed(1234)
 
+if (! file.exists(fastaFile) & file.exists(paste0(fastaFile, ".gz"))) {
+    gunzip(paste0(fastaFile, ".gz"))
+}
+if(! file.exists(gtfFile) & file.exists(paste0(gtfFile, ".gz"))){
+  gunzip(paste0(gtfFile, ".gz"))
+}
+
 #characterize existing dataset
 dataChar <- characterizeData(bamDir,
                              gtfFile,
@@ -48,7 +56,7 @@ dataChar <- characterizeData(bamDir,
 
 # this may take a few minutes.
 # To save time you can also read in the datacharacteristics provided, by uncommenting the following line:
-# dataChar <- DataCharacteristics(dataCharDir)
+#dataChar <- DataCharacteristics(dataCharDir)
 
 #we get 2 transcripts for 10 random genes (with at least 2 annotated transcripts and 1000 bp length) from the reference annotation
 gtf_simul <- getTranscripts(gtf = gtfFile,
@@ -112,4 +120,5 @@ simulateReads(transcriptExpression = transcriptExpression,
               PAF = 2,
               errorRate = 0.005,
               seed = 1234)
+
 
