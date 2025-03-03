@@ -57,11 +57,13 @@ characterizeData <- function(bam, gtf, fasta, out, nCPU = 4, numReads = NULL, nB
     stop()
   }
 
+  python_cmd <- system.file("scripts", "characterizeData.py", package = "smartSim")
+
   if (dir.exists(bam)){
-    python_cmd = paste("scripts/characterizeData.py",
+    python_cmd = paste(python_cmd,
                        "--bamDir", bam)
   } else{
-    python_cmd = paste("scripts/characterizeData.py",
+    python_cmd = paste(python_cmd,
                        "--bamFile", bam)
   }
   if (! is.null(nBam)){

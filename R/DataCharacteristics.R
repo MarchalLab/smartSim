@@ -97,7 +97,7 @@ sampleUMIcounts <- function(dataChar, n, minCount = 0){
 
   midpoints <- dataChar$UMIsPerGene$mids[dataChar$UMIsPerGene$mids > minCount] - 0.5
   counts <- dataChar$UMIsPerGene$counts[dataChar$UMIsPerGene$mids > minCount]
-
+  
   return(sample(midpoints, size = n, replace = TRUE, prob = counts))
 }
 

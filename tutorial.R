@@ -107,6 +107,8 @@ clusterPSI <- getRandomClusterPSI(gtf = gtf_simul,
 #create transcript count matrix
 transcriptExpression <- merge(clusterPSI, geneExpression, by = c("gene_id", "cluster"))
 transcriptExpression$transcriptExpression <- round(transcriptExpression$geneExpression * transcriptExpression$PSI)
+write.table(transcriptExpression, paste0(trueTranscriptDir, "/transcriptExpression.tsv"), 
+            sep = "\t")
 
 #simulate reads
 simulateReads(transcriptExpression = transcriptExpression,

@@ -37,7 +37,7 @@ getRandomGeneExpression <- function(nClusters, nCellsPerCluster, genes, dataChar
   colnames(cellSize) <- "cellSize"
   cellSize$cell <- paste0("cluster", rep(1:nClusters, each = nCellsPerClust), "_cell", rep(1:nCellsPerClust, nClusters))
   cellSize$cluster <- rep(1:nClusters, each = nCellsPerClust)
-
+  
   geneExpr <- merge(clusterExpr, cellSize, by = "cluster")
   geneExpr$geneExpression <- geneExpr$clusterExpr * geneExpr$cellSize
   geneExpr <- geneExpr[, c("cluster", "cell", "gene_id", "geneExpression")]

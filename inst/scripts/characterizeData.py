@@ -19,7 +19,7 @@ import matplotlib.pyplot as plt
 from sklearn.linear_model import LinearRegression
 import numpy as np
 import statsmodels.api as sm
-import git
+#import git
 
 lowess = sm.nonparametric.lowess
 
@@ -806,11 +806,11 @@ def main():
     
     args = _parse_arguments()
     
-    repo = git.Repo(search_parent_directories=True)
-    commit_hash = repo.head.object.hexsha
+    #repo = git.Repo(search_parent_directories=True)
+    #commit_hash = repo.head.object.hexsha
     
     print("### getting bias from Smart-Seq3 experiment ###")
-    print("git commit: " + commit_hash)
+    #print("git commit: " + commit_hash)
     print(" ".join(sys.argv))
     print("###############################################")
 
