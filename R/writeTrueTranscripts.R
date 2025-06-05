@@ -52,5 +52,24 @@ writeTrueTranscripts <- function(gtf, fasta, out){
   transcript_fasta <- DNAStringSet(lapply(split_list, unlist))
   
   writeXStringSet(transcript_fasta, paste0(out, "/transcripts.fa"))
+  
+  #get unspliced transcript sequences
+  unspliced = lapply(chrs, function(chr){
+    dftmp = gtf[(gtf$seqname==chr) & (gtf$type == "gene"),]
+    fullseq = ref_seq[which(names(ref_seq) == chr)]
+    these_seqs = subseq(rep(fullseq, times=nrow(dftmp)), start=dftmp$start,
+                        end=dftmp$end)
+    names(these_seqs) = dftmp$gene_id
+    these_seqs
+  })
+  unspliced_list = do.call(c, unspliced)
+  
+  #reverse complement for neg strand
+  unspliced_list[names(unspliced_list) %in% gtf$gene_id[gtf$strand == "-"]] = reverseComplement(unspliced_list[names(unspliced_list) %in% gtf$gene_id[gtf$strand == "-"]])
+  names(unspliced_list) <- paste0(names(unspliced_list), "_unspliced")
+  unspliced_fasta <- DNAStringSet(lapply(unspliced_list, unlist))
+  
+  #combine the spliced and unspliced sequences
+  transcript_fasta <- c(transcript_fasta, unspliced_fasta)
   return(transcript_fasta)
 }

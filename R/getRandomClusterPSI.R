@@ -12,8 +12,11 @@
 #'
 #' @export
 #' @importFrom dplyr %>% group_by mutate bind_rows
+#' @importFrom stats runif
 getRandomClusterPSI <- function(gtf, nClusters, fixedGenes, diffGenes, seed){
 
+  gene_id <- PSI <- cluster <- NULL #binding variable locally to function
+  
   set.seed(seed)
 
   #check if genes in gtf

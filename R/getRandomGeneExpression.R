@@ -13,9 +13,10 @@
 #' @return matrix containing gene expression for each cell
 #'
 #' @export
+#' @importFrom stats runif
 #get random gene expression for each cell
 getRandomGeneExpression <- function(nClusters, nCellsPerCluster, genes, dataChar, minCount = 0, seed = 1234){
-
+  
   print("getting random gene expression")
   set.seed(seed)
 
@@ -32,11 +33,11 @@ getRandomGeneExpression <- function(nClusters, nCellsPerCluster, genes, dataChar
   clusterExpr$cluster <- rep(1:nClusters, each = length(genes))
 
   #sample cellsize for each cell within the same cluster (cellSize is between 1/4 and 4)
-  cellSize <- as.data.frame(2^runif(nCellsPerClust*nClusters, min = -2, max = 2),
-                            nrow = nCellsPerClust * nClusters, ncol = 1)
+  cellSize <- as.data.frame(2^runif(nCellsPerCluster*nClusters, min = -2, max = 2),
+                            nrow = nCellsPerCluster * nClusters, ncol = 1)
   colnames(cellSize) <- "cellSize"
-  cellSize$cell <- paste0("cluster", rep(1:nClusters, each = nCellsPerClust), "_cell", rep(1:nCellsPerClust, nClusters))
-  cellSize$cluster <- rep(1:nClusters, each = nCellsPerClust)
+  cellSize$cell <- paste0("cluster", rep(1:nClusters, each = nCellsPerCluster), "_cell", rep(1:nCellsPerCluster, nClusters))
+  cellSize$cluster <- rep(1:nClusters, each = nCellsPerCluster)
   
   geneExpr <- merge(clusterExpr, cellSize, by = "cluster")
   geneExpr$geneExpression <- geneExpr$clusterExpr * geneExpr$cellSize

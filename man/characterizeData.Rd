@@ -14,7 +14,8 @@ characterizeData(
   nBam = NULL,
   seed = 1234,
   stage = "geneFilt",
-  phred = 33
+  phred = 33,
+  condaEnv = "smartSim"
 )
 }
 \arguments{
@@ -37,6 +38,8 @@ characterizeData(
 \item{stage}{stage from where to start running: geneFilt, readBams, plotStats [default = geneFilt]}
 
 \item{phred}{phred encoding [default = 33]}
+
+\item{condaEnv}{name of conda environment [default = "smartSim"]}
 }
 \value{
 object of class "DataCharacteristics"

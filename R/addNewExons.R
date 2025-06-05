@@ -93,7 +93,7 @@ addNewExonSingleGene <- function(existingTranscripts, ref_seq, canonical){
       newExon$end <- endPos
       newExon$width <- endPos - startPos + 1
       newExon$type <- "exon"
-      newExon$exon_id <-  paste0(gene_id, "novelExon")
+      newExon$exon_id <-  paste0(gene_id, "newExon")
 
       newTranscript <- rbind(rbind(firstExons, newExon), lastExons)
       newTranscript$exon_number <- 1:nrow(newTranscript)
@@ -113,8 +113,8 @@ addNewExonSingleGene <- function(existingTranscripts, ref_seq, canonical){
       newTranscript$gene_id <- gene_id
       newTranscript$gene_type <- gene_type
       newTranscript$gene_name <- gene_name
-      newTranscript$transcript_id <- paste0(gene_id, "novelExon")
-      newTranscript$transcript_type <- "novelExon"
+      newTranscript$transcript_id <- paste0(gene_id, "newExon")
+      newTranscript$transcript_type <- "newExon"
 
       newTranscript[, ! colnames(newTranscript) %in% c("seqnames", "start", "end", "width", "strand", "type",
                                                        "gene_id", "gene_type", "gene_name", "transcript_id",
@@ -139,6 +139,7 @@ addNewExonSingleGene <- function(existingTranscripts, ref_seq, canonical){
 #'
 #' @param annot_gtf table containing gtf info for annotated transcripts
 #' @param gene_ids genes for which transcript with novel exon should be added
+#' @param fasta fastaFile containing the reference genome
 #' @param canonical new exons are canonical (GT donor site, AG acceptor site) [default = TRUE]
 #' @param seed seed for reproducability [default = 1234]
 #'

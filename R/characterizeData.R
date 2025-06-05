@@ -12,12 +12,13 @@
 #' @param seed random seed for reproducibility [default = 1234]
 #' @param stage stage from where to start running: geneFilt, readBams, plotStats [default = geneFilt]
 #' @param phred phred encoding [default = 33]
+#' @param condaEnv name of conda environment [default = "smartSim"]
 #'
 #' @return object of class "DataCharacteristics"
 #'
 #' @export
-characterizeData <- function(bam, gtf, fasta, out, nCPU = 4, numReads = NULL, nBam = NULL, seed = 1234, stage = "geneFilt", phred = 33) {
-
+characterizeData <- function(bam, gtf, fasta, out, nCPU = 4, numReads = NULL, nBam = NULL, seed = 1234, stage = "geneFilt", phred = 33, condaEnv = "smartSim") {
+  
   #checks
   if (! stage %in% c("geneFilt", "readBams", "plotStats")){
     print(paste0(stage, " is not a valid value for stage."))
@@ -56,6 +57,10 @@ characterizeData <- function(bam, gtf, fasta, out, nCPU = 4, numReads = NULL, nB
     print("provide valid bam file/directory")
     stop()
   }
+  
+  if (Sys.getenv("CONDA_DEFAULT_ENV") != condaEnv){
+    warning("smartSim conda environment is not activated.") #TODO remove conda env below
+  }
 
   python_cmd <- system.file("scripts", "characterizeData.py", package = "smartSim")
 
@@ -85,13 +90,12 @@ characterizeData <- function(bam, gtf, fasta, out, nCPU = 4, numReads = NULL, nB
                   "--phred", phred,
                   ">", paste0(out, "/out.log"))
 
-  print(python_cmd)
+  system2("python", python_cmd)
 
-  conda_env = "smartSim"
-  system2("conda", args = c("run", "-n", conda_env, "python", python_cmd))
+  #system2("conda", args = c("run", "-n", condaEnv, "python", python_cmd))
 
   #read data characteristics & return object
-  return(DataCharacteristics(dataCharDir))
+  return(DataCharacteristics(out))
 
 }
 

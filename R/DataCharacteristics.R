@@ -6,16 +6,21 @@
 #' @return object of class "DataCharacteristics"
 #'
 #' @importFrom dplyr %>% group_by n_distinct
+#' @importFrom utils read.table 
+#' @importFrom stats quantile 
+#' @importFrom graphics hist
 #' @export
 DataCharacteristics <- function(inDir){
-
+  cell <- gene <- UMI <- numReads <- NULL #binding variable locally to function
+  
   #read data
   UMIcounts <- read.table(paste0(inDir, "/", "UMIcounts.tsv"), sep = "\t", header = TRUE)
   fragLen <- read.table(paste0(inDir, "/", "fragmentLength.tsv"), sep = "\t", header= TRUE)
   fragLen_UMI <- read.table(paste0(inDir, "/", "fragmentLength_UMI.tsv"), sep = "\t", header = TRUE)
   fragLen_nonUMI <- read.table(paste0(inDir, "/", "fragmentLength_nonUMI.tsv"), sep = "\t", header = TRUE)
-  readQual <- read.table(paste0(inDir, "/", "readQual.tsv"), sep = "\t", header = TRUE, comment.char="")
-  bcQual <- read.table(paste0(inDir, "/", "readQual.tsv"), sep = "\t", header = TRUE, comment.char="")
+  readQual <- read.table(paste0(inDir, "/", "readQual.tsv"), sep = "\t", header = TRUE, comment.char="", quote = NULL)
+  bcQual <- read.table(paste0(inDir, "/", "readQual.tsv"), sep = "\t", header = TRUE, comment.char="", quote = NULL)
+  intronicReads <- read.table(paste0(inDir, "/", "intronicReads.tsv"), sep = "\t", header = TRUE, comment.char = "", quote = NULL)
 
   # number of unique UMIs per gene
   UMIsPerGene <- UMIcounts[UMIcounts$UMI != "noUMI",] %>%
@@ -36,20 +41,22 @@ DataCharacteristics <- function(inDir){
                            plot = FALSE)
 
   #fragment length for UMI-containing reads
-  fragLen_UMI[order(fragLen_UMI$val), ]
+  fragLen_UMI <- fragLen_UMI[order(fragLen_UMI$val), ]
   fragLen_UMI$cumSum <- cumsum(fragLen_UMI$count)
   tot <- fragLen_UMI$cumSum[nrow(fragLen_UMI)]
   fragLen_UMI <- fragLen_UMI[fragLen_UMI$cumSum >= 0.01*tot, ] #q01
   fragLen_UMI <- fragLen_UMI[fragLen_UMI$cumSum <= 0.99*tot, ] #q99
-  fragLen_UMI_hist <- list("mids" = fragLen_UMI$val, "counts" = fragLen_UMI$count)
+  fragLen_UMI <- smoothData(fragLen_UMI)
+  fragLen_UMI_hist <- list("mids" = fragLen_UMI$val, "counts" = fragLen_UMI$smooth)
 
   #fragment length for non UMI-containing reads
-  fragLen_nonUMI[order(fragLen_nonUMI$val), ]
+  fragLen_nonUMI <- fragLen_nonUMI[order(fragLen_nonUMI$val), ]
   fragLen_nonUMI$cumSum <- cumsum(fragLen_nonUMI$count)
   tot <- fragLen_nonUMI$cumSum[nrow(fragLen_nonUMI)]
   fragLen_nonUMI <- fragLen_nonUMI[fragLen_nonUMI$cumSum >= 0.01*tot, ] #q01
   fragLen_nonUMI <- fragLen_nonUMI[fragLen_nonUMI$cumSum <= 0.99*tot, ] #q99
-  fragLen_nonUMI_hist <- list("mids" = fragLen_nonUMI$val, "counts" = fragLen_nonUMI$count)
+  fragLen_nonUMI <- smoothData(fragLen_nonUMI)
+  fragLen_nonUMI_hist <- list("mids" = fragLen_nonUMI$val, "counts" = fragLen_nonUMI$smooth)
 
 
   #distribution of number of nonUMI reads vs. UMI reads
@@ -63,6 +70,12 @@ DataCharacteristics <- function(inDir){
                            breaks = seq(0, max(numNonUMIvsUMI), by=0.1),
                            plot = FALSE)
 
+  #distribution of number of intronic vs exonic reads
+  intronicFrac <- intronicReads[,"intronicReads"]/(intronicReads[,"intronicReads"] + intronicReads[,"exonicReads"])
+  intronicFrac_hist <- hist(intronicFrac,
+                            breaks = seq(0, 1, by=0.01),
+                            plot = FALSE)
+  
   #quality
   readQual$pos <- readQual$pos + 1 #R uses 1-based indexing
   bcQual$pos <- bcQual$pos + 1 #R uses 1-based indexing
@@ -73,12 +86,34 @@ DataCharacteristics <- function(inDir){
               "UMIsPerGene" = UMIsPerGene_hist,
               "readsPerUMI" = readsPerUMI_hist,
               "nonUMIvsUMI" = nonUMIvsUMI_hist,
+              "intronicFrac" = intronicFrac_hist,
               "readQual" = readQual,
               "bcQual" = bcQual)
   class(obj) <- "DataCharacteristics"
   return(obj)
 
 }
+
+#helper functions
+ma <- function(x, n = 11){
+  smoothVal <- as.vector(filter(x, rep(1 / n, n), sides = 2))
+  
+  smoothVal[1:as.integer(n/2)] = mean(x[1:as.integer(n/2)]) #set first values
+  smoothVal[(length(x)-(as.integer(n/2)+1)):length(x)] = mean(x[(length(x)-(as.integer(n/2)+1)):length(x)]) #set last values
+  return(smoothVal)
+}
+
+smoothData <- function(countTable){
+  #create table with all possible values
+  fullTable<- data.frame(count = rep(0, max(countTable$val)-min(countTable$val)+1), 
+                         row.names = min(countTable$val):max(countTable$val))
+  fullTable[as.character(countTable$val), "count"] = countTable$count
+
+  fullTable$smooth <- ma(fullTable$count, 11)
+  fullTable$val <- as.numeric(row.names(fullTable))
+  return(fullTable[, c("val", "smooth")])
+}
+
 
 #' @title sampleUMIcounts
 #'
@@ -138,7 +173,7 @@ sampleUMIfragLen <- function(dataChar, n, minLen){
 
   midpoints <- dataChar$fragLen_UMI$mids
   counts <- dataChar$fragLen_UMI$counts
-
+  
   return(sample(midpoints[midpoints >= minLen], size = n, replace = TRUE, prob = counts[midpoints >= minLen]))
 
 }
@@ -256,4 +291,24 @@ sampleBCQual <- function(dataChar, rLen, n){
   }
   return(apply(qualStr, 2, paste0, collapse = ""))
 
+}
+
+#' @title sampleUnspliced
+#'
+#' @description sample fraction of unspliced transcripts
+#'
+#' @param dataChar DataCharacteristics object
+#' @param n number of sample fractions to sample
+#'
+#' @export
+sampleUnspliced <- function(dataChar, n){
+  
+  #param checks
+  if (!inherits(dataChar, "DataCharacteristics")) stop("Not a DataCharacteristics object")
+  if (! is.numeric(n) | ! n%%1 == 0 | ! n>0) stop("value n = ", n, " is not valid")
+  
+  midpoints <- dataChar$intronicFrac$mids - 0.005
+  counts <- dataChar$intronicFrac$counts
+  
+  return(sample(midpoints, size = n, replace = TRUE, prob = counts))
 }

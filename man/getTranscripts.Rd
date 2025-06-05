@@ -6,10 +6,10 @@
 \usage{
 getTranscripts(
   gtf,
-  fasta,
-  nTx,
+  nTx = NULL,
   out,
   genes = NULL,
+  transcripts = NULL,
   nRandomGenes = NULL,
   minTxLen = 1000,
   seed = 1234
@@ -18,15 +18,15 @@ getTranscripts(
 \arguments{
 \item{gtf}{gtfFile containing the reference annotation}
 
-\item{fasta}{fastaFile containing the reference genome}
-
-\item{nTx}{number of transcripts per gene}
+\item{nTx}{number of transcripts per gene (not used if list of transcripts given}
 
 \item{out}{outdir to write geneInfo file}
 
 \item{genes}{list of genes}
 
-\item{nRandomGenes}{number of random genes for which transcripts are selected (not used if list of genes given)}
+\item{transcripts}{list of transcripts}
+
+\item{nRandomGenes}{number of random genes for which transcripts are selected (not used if list of genes or transcripts given)}
 
 \item{minTxLen}{minimum transcript length [default = 1000]}
 

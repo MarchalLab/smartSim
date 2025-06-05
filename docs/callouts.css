@@ -1,0 +1,24 @@
+.callout-tip, .callout-note, .callout-warning, .callout-important, .callout-caution {
+  border-left: 4px solid #007acc;
+  padding: 1em;
+  background-color: #f5f5f5;
+  margin: 1em 0;
+  border-radius: 5px;
+}
+.callout-tip { border-color: #2c9c69; }
+.callout-tip::before {
+  content: "Tip";
+  color: #2c9c69;
+}
+
+.callout-warning::before {
+  content: "⚠️ Warning";
+  color: #cc0000;
+}
+.callout-warning { border-color: #cc0000; }
+
+.callout-note::before {
+  content: "Note";
+  color: #007acc;
+}
+.callout-note { border-color: #007acc; }

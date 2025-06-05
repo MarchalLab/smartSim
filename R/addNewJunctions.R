@@ -19,6 +19,8 @@ getJunction <- function(row1, row2){
 #add de novo junction for single gene
 addNewJunctionSingleGene <- function(existingTranscripts){
 
+  transcript_id <- NULL #binding variable locally to function
+  
   #all transcripts should be from the same gene
   if (length(unique(existingTranscripts$gene_id)) != 1){
     stop("make sure all transcripts in existingTranscripts are from the same gene")
@@ -85,7 +87,7 @@ addNewJunctionSingleGene <- function(existingTranscripts){
                            newTranscript)
 
     newTranscript$transcript_id <- paste0(gene_id, "newJunction")
-    newTranscript$transcript_type <- "novelJunction"
+    newTranscript$transcript_type <- "newJunction"
 
     newTranscript[, ! colnames(newTranscript) %in% c("seqnames", "start", "end", "width", "strand", "type",
                                                      "gene_id", "gene_type", "gene_name", "transcript_id",
@@ -114,6 +116,7 @@ addNewJunctionSingleGene <- function(existingTranscripts){
 #' @return the updated table containing gtf info for the annotated transcripts and the novel transcripts
 #' @export
 #' @importFrom dplyr %>% arrange n reframe
+#' @importFrom utils combn
 addNewJunctions <- function(annot_gtf, gene_ids, seed = 1234){
 
   if (! all(gene_ids %in% annot_gtf$gene_id))

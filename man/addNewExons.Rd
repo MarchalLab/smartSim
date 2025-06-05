@@ -11,6 +11,8 @@ addNewExons(annot_gtf, gene_ids, fasta, canonical = TRUE, seed = 1234)
 
 \item{gene_ids}{genes for which transcript with novel exon should be added}
 
+\item{fasta}{fastaFile containing the reference genome}
+
 \item{canonical}{new exons are canonical (GT donor site, AG acceptor site) [default = TRUE]}
 
 \item{seed}{seed for reproducability [default = 1234]}

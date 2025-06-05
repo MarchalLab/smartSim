@@ -1,0 +1,497 @@
+---
+title: "smartSim tutorial"
+output:
+  html_document :
+    css: callouts.css
+  mathjax: default
+bibliography: bibliography.bib
+csl: elsevier-vancouver.csl
+vignette: >
+  %\VignetteIndexEntry{smartSim tutorial}
+  %\VignetteEngine{rmarkdown::html_vignette}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, results = "hold")
+```
+
+## Installation
+
+Before installing smartSim, ensure that the appropriate Conda environment is activated. 
+This environment is provided at:  https://github.com/MarchalLab/smartSim.
+
+To install smartSim from GitHub, follow the instructions below:
+
+```{r installGit}
+library(devtools)
+install_github("MarchalLab/smartSim", dependencies = TRUE, repos = BiocManager::repositories())
+```
+
+::: {.callout-note}
+Alternatively, you may install SmartSim from a local copy using:
+
+```{r installLocal, eval = FALSE}
+ssPath <- "path/to/smartSim" #use your path to smartSim
+install.packages(ssPath, repos = NULL, type="source")
+```
+:::
+
+Once installed, load SmartSim along with the remaining required packages:
+```{r libraryIncl, results='hide', message=FALSE}
+library(smartSim)
+library(R.utils)
+```
+
+## Output directories
+
+We begin by creating the main output directory, followed by subdirectories to organize the generated data:
+```{r createOutDir}
+# Define and create the main output directory
+outDir <- "example_data_out"
+dir.create(outDir, recursive = TRUE)
+
+# Define subdirectories
+dataCharDir <- file.path(outDir, "dataChar")
+trueTranscriptDir <- file.path(outDir, "trueTranscripts")
+readDir <- file.path(outDir, "reads")
+```
+
+## Input files
+
+We begin by loading the required aligned bam files. 
+For this tutorial, we use an example dataset derived from 192 HEK293FT cells that underwent Smart-seq3 library preparation, as described in Hagemann-Jensen et al. [@Hagemann-Jensen2020] (accession number: E-MTAB-8735).
+
+We downloaded this data, and used zUMIs [@Parekh2018] to align the reads to the human reference genome and determine the cell barcode and UMI for each read.
+We provide the script used at:
+https://github.com/MarchalLab/smartSim/scripts/getData.sh
+
+For demonstration purposes, only the reads aligning to chromosome 1 have been selected.
+
+```{r getBamDir}
+# Locate the example bam files provided with the smartSim package
+bamDir <- system.file("extdata","aligned", package = "smartSim")
+```
+
+Next, we load the reference annotation files required for simulation. 
+Ensure that the GTF and FASTA files match those used during the alignment step when providing your own bam files.
+```{r loadRef}
+# Define paths for uncompressed reference files
+gtfFile <- file.path(outDir, "chr1.gtf")
+fastaFile <- file.path(outDir, "chr1.fa")
+
+# Locate and uncompress the reference files provided with the smartSim package
+gunzip(system.file("extdata","chr1.gtf.gz", package = "smartSim"), destname = gtfFile, remove = FALSE)
+gunzip(system.file("extdata","chr1.fa.gz", package = "smartSim"), destname = fastaFile, remove = FALSE)
+```
+
+## Input parameters
+
+In this tutorial, we simulate two groups of single cells, each containing 10 cells. 
+Every cell expresses 10 distinct genes, with each gene producing two (already annotated) transcript isoforms.
+
+To mimic the characteristics of Smart-seq3 data from Hagemann-Jensen et al., we use:
+
+* Cell barcodes of length 8
+* Unique Molecular Identifiers (UMIs) of length 8
+* Paired-end reads with lengths of 150 bp each (i.e., 2 $\times$ 150 bp)
+
+In this tutorial, we will generate 2 groups of 10 cells each. Each cell expresses 10 different genes with each 2 (already annotated) transcripts. 
+Similarly to the Smart-seq3 data from Hagemann-Jensen, we use a cell barcode with length 8, a UMI with length 8 and paired end reads with length x $\times$ 150bp.
+
+```{r setInputPar}
+# Simulation design parameters
+nClust = 2            #number of cell populations
+nCellsPerClust = 10   #number of cells per cell population
+nGenes = 10           #number of genes to simulate
+nTx = 2               #number of transcripts per gene
+
+# Smart-seq3 and sequencing configuration
+barcodeLen = 8        #length of cell barcode
+UMIlen = 8            #length of UMI
+readLen = 150         #length of 1 end of PE read
+tag = "ATTGCGCAATG"   #Smart-seq3 tag used to identify UMI containing reads
+
+# Set seed for reproducibility
+set.seed(1234)
+```
+
+## Data characterization
+
+To simulate data that closely mimics the characteristics of the existing Smart-seq3 dataset, we first perform a data characterization step. This process extracts empirical distributions and summary statistics from the aligned reads, which are later used to guide simulation.
+
+The following features are extracted:
+
+* the distribution of fragment lengths for UMI containing reads (`fragmentLength_nonUMI.tsv`);
+* the distribution of fragment lengths for internal reads (`fragmentLength_UMI.tsv`);
+* the number of reads per UMI (including counts for internal reads) per gene per cell (`UMIcounts.tsv`);
+* the number of intronic vs exonic bases covered per gene per cell, as a proxy for the unspliced vs. spliced transcripts (`intronicReads.tsv`);
+* the positional distribution of quality scores for read sequences (`readQual`.tsv`);
+* the positional distribution of quality scores for barcode sequences (`bcQual.tsv`).
+
+Note: For demonstration purposes, we limit the analysis to the first 10 000 reads per bam file using `numReads = 10000`. By default, all reads are processed (`numReads = NULL`).
+
+Additionally, we assume that cell barcodes are stored under the "BC" tag and UMIs are stored under the "UB" tag in the bam files.
+These tags are consistent with the output from zUMIs [@Parekh2018]. 
+If you used a different tool for alignment and demultiplexing, ensure that the barcode and UMI tags follow the same convention.
+
+```{r charData}
+# Characterize the Smart-seq3 dataset
+dataChar <- characterizeData(bam = bamDir,
+                             gtf = gtfFile,
+                             fasta = fastaFile,
+                             out = dataCharDir,
+                             nCPU = 4,
+                             numReads = 10000,
+                             seed = 1234,
+                             stage = "geneFilt",
+                             phred = 33)
+```
+
+This step typically takes around 20 minutes, but the exact time may vary depending on your system's performance, data size, and I/O speed. Runtime may vary across different machines.
+
+::: {.callout-tip}
+To save time, you can skip the data characterization step by loading the precomputed characteristics that are provided with the smartSim package. 
+This allows you to proceed directly to the simulation step without rerunning the resource-intensive characterization process.
+```{r loadChar, eval = FALSE}
+# Load precomputed data characteristics
+dataChar <- DataCharacteristics(inDir = system.file("extdata","dataChar", package = "smartSim"))
+```
+:::
+
+::: {.callout-note}
+If your aligned dataset is not demultiplexed in cell specific bam files, you can instead provide a single bam file directly to the characterizeData() function.
+
+As before, ensure that:
+
+* Cell barcode information is stored in the "BC" tag
+* UMI information is stored in the "UB" tag.
+
+```{r charDataSingleBam, eval=FALSE}
+# Characterize data from a single bam file
+dataChar <- characterizeData(bam = "path/to/your/bamFile.bam",
+                             gtf = gtfFile,
+                             fasta = fastaFile,
+                             out = dataCharDir,
+                             nCPU = 4,
+                             numReads = NULL,
+                             seed = 1234,
+                             stage = "geneFilt",
+                             phred = 33)
+```
+:::
+
+## Preparing ground truth
+
+### Getting all transcripts to simulate
+
+To generate synthetic data, we begin by selecting a subset of annotated transcripts from the reference GTF file. 
+In this example, we randomly select 2 transcripts per gene for 10 randomly chosen genes.
+
+```{r getTranscripts}
+# Select annotated transcripts for simulation
+gtf_simul <- getTranscripts(gtf = gtfFile,
+                            nTx = nTx,
+                            out = trueTranscriptDir,
+                            nRandomGenes = nGenes,
+                            minTxLen = 1000,
+                            seed = 1234)
+
+# Preview selected transcripts
+head(gtf_simul)
+```
+This step generates a table containing all gene, transcript and exon information for the selected transcripts.
+
+::: {.callout-note}
+If you have a predefined list of gene IDs, you can pass them directly to `getTranscripts()` instead of selecting genes at random:
+```{r, eval=FALSE}
+# Example: using 10 predefined gene IDs
+genes <- c("ENSG00000116898.12", "ENSG00000162437.14", "ENSG00000223883.2",  "ENSG00000009307.16", "ENSG00000177551.5", 
+           "ENSG00000281741.2", "ENSG00000159208.16", "ENSG00000143418.20", "ENSG00000183856.11", "ENSG00000188585.9")
+gtf_simul <- getTranscripts(gtf = gtfFile,
+                            nTx = nTx,
+                            out = trueTranscriptDir,
+                            genes = genes,
+                            minTxLen = 1000,
+                            seed = 1234)
+
+# Preview selected transcripts
+head(gtf_simul)
+```
+Ensure that each gene in your list has at least `nTx` annotated transcripts available in the reference GTF file.
+Genes that do not meet this requirement will be ignored by `getTranscripts()`.
+:::
+
+::: {.callout-note}
+If you want to simulate different numbers of transcripts per gene, you can run getTranscripts() separately for each different groups of genes, and then concatenate the resulting GTF tables. This approach allows full control over transcript complexity per gene, enabling more flexible simulation scenarios.
+
+The example below simulates:
+
+* 5 genes with 2 transcripts per gene
+* 5 genes with 3 transcripts per gene
+
+```{r, eval = FALSE}
+# Define gene groups
+genes1 <- c("ENSG00000116898.12", "ENSG00000162437.14",  "ENSG00000177551.5", "ENSG00000281741.2", "ENSG00000183856.11") 
+genes2 <- c("ENSG00000223883.2", "ENSG00000009307.16", "ENSG00000159208.16", "ENSG00000143418.20",  "ENSG00000188585.9")
+
+# Select 2 transcripts per gene
+gtf_simul1 <- getTranscripts(gtf = gtfFile,
+                            nTx = 2,
+                            out = trueTranscriptDir,
+                            genes = genes1,
+                            minTxLen = 1000,
+                            seed = 1234)
+
+# Select 3 transcripts per gene
+gtf_simul2 <- getTranscripts(gtf = gtfFile,
+                            nTx = 3,
+                            out = trueTranscriptDir,
+                            genes = genes2,
+                            minTxLen = 1000,
+                            seed = 1234)
+
+# Combine into a single table
+gtf_simul <- rbind(gtf_simul1, gtf_simul2)
+
+# Preview selected transcripts
+head(gtf_simul)
+```
+:::
+
+::: {.callout-note}
+
+You can also extract transcript annotations from a predefined list of transcript IDs. 
+This allows full control over which transcripts are included in the simulation.
+In the example below, we retrieve annotation data for 10 transcripts from 4 different genes.
+
+```{r, eval=FALSE}
+# Predefined list of transcript IDs
+transcripts <- c("ENST00000488606.5", "ENST00000462067.1", 
+                 "ENST00000371072.8", "ENST00000418058.1", 
+                 "ENST00000482825.7", "ENST00000345896.8", "ENST00000271688.10", 
+                 "ENST00000646925.1", "ENST00000623247.2", "ENST00000445098.2")
+
+# Extract corresponding GTF annotation
+gtf_simul <- getTranscripts(gtf = gtfFile,
+                            out = trueTranscriptDir,
+                            transcripts = transcripts,
+                            minTxLen = 1000,
+                            seed = 1234)
+head(gtf_simul)
+```
+:::
+
+### Introducing novel splicing events
+
+To simulate alternative splicing and transcriptome complexity, you can introduce novel splicing events to selected genes. Below, we demonstrate how to add both novel junctions and novel exons.
+
+#### Add new junctions
+
+We introduce one new junction in each of the first two genes from the current annotation:
+
+```{r}
+# Select first two genes for novel junctions
+genes_nj <- unique(gtf_simul$gene_id)[1:2]
+
+# Add new junctions
+gtf_simul <- addNewJunctions(annot_gtf = gtf_simul,
+                             gene_ids = genes_nj,
+                             seed = 1234)
+
+#inspect transcript IDs
+print(unique(gtf_simul$transcript_id))
+```
+Each new transcript containing a new junction is assigned a name following the pattern: `geneIDnewJunction`.
+
+
+#### Add new exons
+We add one new exon to each of the next two genes. By default, the new exon will be selected such that the splice sites are canonical, i.e. a GT donor site and an AG acceptor site:
+
+```{r novelExons}
+# Select next two genes for novel exons
+genes_ne <- unique(gtf_simul$gene_id)[3:4]
+
+# Add new exons
+gtf_simul <- addNewExons(annot_gtf = gtf_simul,
+                         fasta = fastaFile,
+                         gene_ids = genes_ne,
+                         canonical = TRUE,
+                         seed = 1234)
+
+#inspect transcriptIDs
+print(unique(gtf_simul$transcript_id))
+```
+Each new transcript containing a new exon is assigned a name following the pattern: `geneIDnewExon`.
+
+#### Write final transcript annotation
+
+Finally, we save the updated GTF and corresponding transcript sequences to file. These will serve as the ground truth for simulation:
+
+```{r writeGTF}
+# Export ground truth transcript annotation and sequences
+transcript_seq = writeTrueTranscripts(gtf = gtf_simul,
+                                      fasta = fastaFile,
+                                      out = trueTranscriptDir)
+```
+
+### Get gene expression
+
+For each cluster of cells, we generate cell-specific gene expression profiles using `getRandomGeneExpression()`. 
+This approach samples expression values from real Smart-seq3 data to closely mimic biological variability and read coverage patterns observed in practice.
+
+Since we are simulating two clusters, each cluster receives a distinct gene expression profile that is shared across all cells in the cluster. 
+To introduce cell-specific variability in sequencing depth, each expression profile is scaled by a randomly sampled cell-specific `cellSize` factor.
+
+```{r}
+geneExpression <- getRandomGeneExpression(nClusters = nClust,
+                                          nCellsPerCluster = nCellsPerClust,
+                                          genes = unique(gtf_simul$gene_id),
+                                          dataChar = dataChar,
+                                          minCount = nTx,
+                                          seed = 1234)
+print(head(geneExpression))
+```
+
+### Get Percent Spliced In values
+
+To simulate alternative splicing, we generate cluster-specific Percent Spliced In (PSI) values for each transcript using `getRandomClusterPSI()`. 
+PSI values represent the relative abundance of each transcript within a gene and are used to simulate transcript-level expression profiles.
+
+In this example:
+
+* The first half of the genes (`fixedGenes`) will have the same PSI values across all clusters, representing genes without differential spicing.
+* The second half (`diffGenes`) will have distinct PSI values per cluster, mimicking differential splicing between cell populations.
+
+```{r}
+# Split genes into those with and without differential splicing
+geneIDs <- unique(gtf_simul$gene_id)
+fixedGenes <- geneIDs[1:(length(geneIDs)/2)]
+diffGenes <- geneIDs[((length(geneIDs)/2)+1):length(geneIDs)]
+
+
+# Generate cluster-specific PSI values
+clusterPSI <- getRandomClusterPSI(gtf = gtf_simul,
+                                  nClusters = nClust,
+                                  fixedGenes = fixedGenes,
+                                  diffGenes = diffGenes,
+                                  seed = 1234)
+print(clusterPSI)
+```
+
+::: {.callout-note}
+You may also provide a custom PSI table, as long as it includes the following columns: "cluster", "gene_id", "transcript_id" and "PSI". 
+Ensure that for each gene in each cluster, the PSI values across transcripts sum to 1.
+
+Here, we provide an example in which the transcripts are equally abundant in all genes.
+```{r, eval=FALSE}
+library(dplyr, quietly = TRUE)
+
+#PSI uniformly distributed across all transcripts of a gene
+clusterPSI <- merge(unique(geneExpression[, c("cluster", "gene_id")]), 
+                    gtf_simul[gtf_simul$type == "transcript", c("gene_id", "transcript_id")], 
+                    by = "gene_id")
+clusterPSI$PSI <- 1 
+
+#ensure PSI values of each gene sum to one per cluster
+clusterPSI <- clusterPSI %>%
+  group_by(gene_id, cluster) %>%
+  mutate(PSI = PSI / sum(PSI))
+
+print(clusterPSI)
+```
+:::
+
+### Get fraction of unspliced transcripts
+
+To emulate realistic transcriptome complexity, we get the fraction of unspliced transcripts per gene per cluster. 
+These values are derived from the provided example dataset to reflect patterns observed in real Smart-seq3 data.
+
+In this example we will simulate reads such that:
+
+* The first half of the genes (`fixedGenes`) have a shared unspliced fraction across clusters, representing no cluster-specific rate of RNA transcription and degradation.
+* The second half of the genes (`diffGenes`) can exhibit differential unspliced proportions, allowing for variation in RNA processing between clusters.
+
+
+```{r}
+# Define gene sets for fixed vs. differential unspliced ratios
+geneIDs <- unique(gtf_simul$gene_id)
+fixedGenes <- geneIDs[1:(length(geneIDs)/2)]
+diffGenes <- geneIDs[((length(geneIDs)/2)+1):length(geneIDs)]
+
+# Generate unspliced transcript fractions per gene and cluster
+unspliced <- getRandomUnspliced(nClusters = nClust, 
+                                fixedGenes = fixedGenes, 
+                                diffGenes = diffGenes, 
+                                dataChar = dataChar, 
+                                seed = 1234)
+print(unspliced)
+
+```
+Since the example dataset is derived from single-cell Smart-seq3 (not single-nucleus RNA-seq), the majority of genes contain low or no unspliced RNA. 
+As a result, many `nUnspliced` values are equal to 0.
+
+::: {.callout-note}
+You can also provide a custom table of unspliced transcript fractions. 
+This table must include the following columns: "cluster", "gene_id" and "nUnspliced".
+
+Here, we provide an example in which there are no unspliced transcripts.
+
+```{r unsplicedNote, eval=FALSE}
+
+unspliced <- unique(geneExpression[, c("cluster", "gene_id")])
+unspliced$nUnspliced <- 0
+
+print(unspliced)
+
+```
+:::
+
+### Get transcript expression
+
+Finally, we combine the cluster-specific PSI values and fractions of unspliced transcripts with the cell-specific gene expression to get the expression for each spliced and unspliced transcript.
+
+```{r transcriptExpression}
+
+transcriptExpression <- getTranscriptExpression(clusterPSI = clusterPSI, 
+                                                unspliced = unspliced, 
+                                                geneExpression = geneExpression, 
+                                                outFile = paste0(trueTranscriptDir, "/transcriptExpression.tsv"))
+
+print(head(transcriptExpression))
+
+```
+
+## simulate reads
+
+With all required inputs prepared, we now proceed to simulate the raw sequencing reads for all cells.
+We generate reads that mimic real Smart-seq3 data by combining transcript expression levels, sequencing characteristics, and error profiles. 
+
+```{r}
+simulateReads(transcriptExpression = transcriptExpression,
+              transcript_seq = transcript_seq,
+              dataChar = dataChar,
+              out = readDir,
+              barcodeLen = barcodeLen,
+              UMIlen = UMIlen,
+              readLen = readLen,
+              tag = tag,
+              PAF = 2,
+              errorRate = 0.005,
+              seed = 1234)
+```
+
+In the `readDir` directory, smartSim will write out :
+
+* the index and read fastq files (`unassigned_I1.fq.gz`, `unassigned_I2.fq.gz`, `unassigned_R1.fq.gz` and `unassinged_R2.fq.gz`);
+* the file containing all cell barcodes (`barcodes.txt`);
+* and the file linking the cell barcodes to the cell and cluster ids (`cell2barcode.tsv`).
+
+
+```{r sessionInfo, include=FALSE}
+writeLines(capture.output(sessionInfo()), "sessionInfo.txt")
+```
+
+
+
+# References

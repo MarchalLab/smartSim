@@ -69,7 +69,7 @@ simulateReads <- function(transcriptExpression, transcript_seq, dataChar, out, b
   if (file.exists(paste0(out, "/unassigned_R2.fq.gz"))) file.remove(paste0(out, "/unassigned_R2.fq.gz"))
   if (file.exists(paste0(out, "/unassigned_I1.fq.gz"))) file.remove(paste0(out, "/unassigned_I1.fq.gz"))
   if (file.exists(paste0(out, "/unassigned_I2.fq.gz"))) file.remove(paste0(out, "/unassigned_I2.fq.gz"))
-
+  
   #generate reads separately per cell
   for (cell in unique(transcriptExpression$cell)){
     print(cell)
@@ -119,14 +119,15 @@ simulateReads <- function(transcriptExpression, transcript_seq, dataChar, out, b
     names(remainingSeq) <- NULL
     remainingSeq <- do.call(c, remainingSeq)
 
-    # nInternal <- round(sampleNonUMIvsUMI(dataChar, n = length(remainingSeq)))
-    # remainingSeq <- rep(remainingSeq, nInternal)
-
     internalFragLen <- sampleNonUMIfragLen(dataChar, n = length(remainingSeq), minLen = readLen)
     internalFragLen <- pmax(pmin(internalFragLen, width(remainingSeq)), readLen)
     validStarts <- width(remainingSeq) - internalFragLen + 1
     randomStarts <- sapply(validStarts, function(x) { sample(1:x, size = 1) })
     nonUMIfrags <- subseq(remainingSeq, start = randomStarts, width = internalFragLen)
+    
+    #randomly reverse internal reads
+    internalReadsToRev <- c(1:length(nonUMIfrags))[runif(length(nonUMIfrags)) < 0.5]
+    nonUMIfrags[internalReadsToRev] <- reverseComplement(nonUMIfrags[internalReadsToRev])
 
     #combine UMI and nonUMI frags
     frags <- c(UMIfrags, nonUMIfrags)
@@ -148,18 +149,6 @@ simulateReads <- function(transcriptExpression, transcript_seq, dataChar, out, b
     I2 <- DNAStringSet(rep(barcode_2, length(R2)))
     names(I1) <- paste0(names(R1), " ", "1:N:0", barcode_1, "+", barcode_2)
     names(I2) <- paste0(names(R2), " ", "2:N:0", barcode_1, "+", barcode_2)
-
-    # if (is.null(I1_all)){
-    #   I1_all <- I1
-    #   R1_all <- R1
-    #   I2_all <- I2
-    #   R2_all <- R2
-    # }else{
-    #   I1_all <- c(I1_all, I1)
-    #   R1_all <- c(R1_all, R1)
-    #   I2_all <- c(I2_all, I2)
-    #   R2_all <- c(R2_all, R2)
-    # }
 
     # Write to FASTQ
     fastq_Q1 <- BStringSet(sampleReadQual(dataChar, readLen, length(R1)))
@@ -190,5 +179,6 @@ simulateReads <- function(transcriptExpression, transcript_seq, dataChar, out, b
   write.table(cell2barcode,
               paste0(out, "/cell2barcode.tsv"),
               sep = "\t", row.names = F, quote = F)
+  
 }
 

@@ -19,6 +19,7 @@ import matplotlib.pyplot as plt
 from sklearn.linear_model import LinearRegression
 import numpy as np
 import statsmodels.api as sm
+import csv
 #import git
 
 lowess = sm.nonparametric.lowess
@@ -175,12 +176,19 @@ def getGCcontent(gtfFile, fastaFile, geneSet):
     #read GTF
     gtf = HTSeq.GFF_Reader(gtfFile)  
     exons = HTSeq.GenomicArrayOfSets(chroms = "auto", stranded = False)
+    introns = HTSeq.GenomicArrayOfSets(chroms = "auto", stranded = False)
     seqGC = HTSeq.GenomicArray(chroms = "auto", stranded = False, typecode = 'b') #true if base is G/C
     for feature in gtf:
-
+        if feature.type == "gene":
+            introns[feature.iv] += feature.name
+        
         if feature.type == "exon":
             #add exon to reference genomic array
             exons[feature.iv] += feature.name
+            
+            #remove from intron
+            for iv, intronGenes in introns[feature.iv].steps():
+                introns[iv] = intronGenes - {feature.name}
 
             #get GC
             #only look at selection of genes
@@ -205,9 +213,9 @@ def getGCcontent(gtfFile, fastaFile, geneSet):
     for gene, count in geneGC.items():
         geneGC[gene] = (count / geneLen[gene]) * 100
 
-    return exons, seqGC, geneGC, geneLen
+    return exons, introns, seqGC, geneGC, geneLen
 
-def readBams(exons, seqGC, geneGC, geneLen, bamFiles, numReads, outDir, nCPU, geneSet):
+def readBams(exons, introns, seqGC, geneGC, geneLen, bamFiles, numReads, outDir, nCPU, geneSet):
 
     # total fragment length distr.
     allFragLen = Counter()
@@ -228,6 +236,9 @@ def readBams(exons, seqGC, geneGC, geneLen, bamFiles, numReads, outDir, nCPU, ge
     allReadQual = []
     allBcQual = []
     
+    #number of intronic bases vs. exonic bases
+    allIntronicReads = dict()
+    
     #statsLock = multiprocessing.Lock()
         
     print("reading bam files")
@@ -236,12 +247,12 @@ def readBams(exons, seqGC, geneGC, geneLen, bamFiles, numReads, outDir, nCPU, ge
     #read bamfiles in parallel
     nCPU = min(len(bamFiles), nCPU)
     with multiprocessing.Pool(nCPU) as pool:
-        res = pool.imap(partial(readSingleBam, exons = exons, seqGC = seqGC, geneSet = geneSet, geneLen = geneLen, numReads = numReads), bamFiles)
+        res = pool.imap(partial(readSingleBam, exons = exons, introns = introns, seqGC = seqGC, geneSet = geneSet, geneLen = geneLen, numReads = numReads), bamFiles)
         pool.close()
         pool.join()
 
         #merge counts from different files
-        for fraglen, fragGeneLen, fragLen_UMI, fragLen_nonUMI, GC, GC_geneAvg, UMIcounts, readQual, bcQual in res:
+        for fraglen, fragGeneLen, fragLen_UMI, fragLen_nonUMI, GC, GC_geneAvg, UMIcounts, readQual, bcQual, intronicReads in res:
             allFragLen.update(fraglen)
             allFragGeneLen.update(fragGeneLen)
             UMIFragLen.update(fragLen_UMI)
@@ -250,6 +261,8 @@ def readBams(exons, seqGC, geneGC, geneLen, bamFiles, numReads, outDir, nCPU, ge
             for gene, avgGC in GC_geneAvg.items():
                 obsGC[gene].append(avgGC)
             allUMIcounts.update(UMIcounts)
+            allIntronicReads.update(intronicReads)
+            
             
             if (len(allReadQual) < len(readQual)):
                 allReadQual += [Counter() for _ in range(len(readQual)-len(allReadQual))]
@@ -318,10 +331,16 @@ def readBams(exons, seqGC, geneGC, geneLen, bamFiles, numReads, outDir, nCPU, ge
     for pos, qualCtr in enumerate(allBcQual):
         for q, count in qualCtr.items():
             f.write(str(pos)  +"\t" + q + "\t" + str(count) + "\n")
+            
+    f = open(outDir + "/intronicReads.tsv", "w")
+    f.write("cell"+ "\t"+ "gene"+ "\t"+ "intronicReads"+ "\t" + "exonicReads" + "\n")
+    for (BC, gene), (intronicReads, exonicReads) in allIntronicReads.items():
+        f.write(BC+ "\t" + gene + "\t" + str(intronicReads) + "\t" + str(exonicReads) + "\n")
+    f.close()
 
 
     
-def readSingleBam(file, exons, seqGC, geneSet, geneLen, numReads):
+def readSingleBam(file, exons, introns, seqGC, geneSet, geneLen, numReads):
 
     print("reading bam file: " + file)
 
@@ -335,6 +354,9 @@ def readSingleBam(file, exons, seqGC, geneSet, geneLen, numReads):
     GC_geneAvg = {}
     UMIcounts = Counter()
     fragPos = {}
+    intron_counter = Counter()
+    exon_counter = Counter()
+    intronicReads = dict()
     
     readQual = []
     bcQual = []
@@ -438,6 +460,17 @@ def readSingleBam(file, exons, seqGC, geneSet, geneLen, numReads):
                     bcQual[i][q] += 1
                 for i, q in enumerate(r2.optional_field("QB")):
                     bcQual[i][q] += 1
+                    
+            #compute exon/intron coverage
+            for read in r1, r2:
+                for iv, step_set in exons[read.iv].steps():
+                    if gene in step_set:
+                        exon_counter[gene] += iv.length
+                for iv, step_set in introns[read.iv].steps():
+                    if gene in step_set:
+                        intron_counter[gene] += iv.length
+            
+            #TODO start here
                 
         except KeyError:
             #chrom of read not in reference
@@ -445,8 +478,10 @@ def readSingleBam(file, exons, seqGC, geneSet, geneLen, numReads):
 
     for gene in GC_geneAvg:
         GC_geneAvg[gene] /= gene_counter[gene]
+        intronicReads[tuple((BC, gene))] = tuple((intron_counter[gene], exon_counter[gene]))
+        
 
-    return fragLen_counter, fragGeneLen_counter, UMIFragLen_counter, nonUMIFragLen_counter, GC_counter, GC_geneAvg, UMIcounts, readQual, bcQual
+    return fragLen_counter, fragGeneLen_counter, UMIFragLen_counter, nonUMIFragLen_counter, GC_counter, GC_geneAvg, UMIcounts, readQual, bcQual, intronicReads
 
 def assignSingleReadToGene(read, exons):
     iset = None
@@ -541,7 +576,7 @@ def boxplotStats(df):
 
 def plotQual(inFile, outFile, phred):
     #read data
-    readQual = pd.read_csv(inFile, sep = '\t')
+    readQual = pd.read_csv(inFile, sep = '\t', quoting=csv.QUOTE_NONE)
     readQual["qual"] = readQual["qual"].apply(ord) - phred
     readQual["pos"] += 1
     maxQual = max(readQual["qual"])
@@ -627,7 +662,21 @@ def plotUMIcounts(inFile, outDir):
     #save figure
     plt.savefig(outDir + "/internalReadsPerUMI.png")
 
+def plotIntronicReads(inFile, outFile):
+    df = pd.read_csv(inFile , sep = '\t')
+    
+    #plot figure
+    fig, ax = plt.subplots()
+    ax.scatter(x = df["intronicReads"],y = df["exonicReads"], alpha = 0.5)
+    plt.title("intronic reads vs. exonic reads")
+    plt.xlabel("intronic reads")
+    plt.ylabel("exonic reads")
+    maxVal = max(max(df["intronicReads"]), max(df["exonicReads"]))
+    ax.set_ylim(0,maxVal)
+    ax.set_ylim(0,maxVal)
 
+    #save figure
+    plt.savefig(outFile)
 
 
 def plotBias(outDir, phred):
@@ -693,6 +742,7 @@ def plotBias(outDir, phred):
     plotQual(outDir + "/readQual.tsv" , outDir + "/readQual.png", phred)
     plotQual(outDir + "/bcQual.tsv", outDir + "/bcQual.png", phred)
 
+    plotIntronicReads(outDir + "/intronicReads.tsv", outDir + "/intronicReads.png")
 
 
 def _parse_arguments():
@@ -842,11 +892,13 @@ def main():
 
         #get GC content and exons for each selected gene
         print("getting GC content of genes")
-        exons, seqGC, geneGC, geneLen = getGCcontent(args.gtfFile, args.fastaFile, uniqueTranscriptGenes)
+        exons, introns, seqGC, geneGC, geneLen = getGCcontent(args.gtfFile, args.fastaFile, uniqueTranscriptGenes)
 
         #write intermediary files
         with open(args.outDir + "/exons.bin", 'wb') as f:
             pickle.dump(exons, f)
+        with open(args.outDir + "/introns.bin", 'wb') as f:
+            pickle.dump(introns, f)
         with open(args.outDir + "/seqGC.bin", 'wb') as f:
             pickle.dump(seqGC, f)
         with open(args.outDir + "/geneGC.bin", 'wb') as f:
@@ -861,6 +913,8 @@ def main():
         #read intermediary files
         with open(args.outDir + "/exons.bin" , 'rb') as f:
             exons = pickle.load(f)
+        with open(args.outDir + "/introns.bin" , 'rb') as f:
+            introns = pickle.load(f)
         with open(args.outDir + "/seqGC.bin" , 'rb') as f:
             seqGC = pickle.load(f)
         with open(args.outDir + "/geneGC.bin" , 'rb') as f:
@@ -886,7 +940,7 @@ def main():
         else:
             bamFiles = [args.bamFile]
             
-        readBams(exons, seqGC, geneGC, geneLen, bamFiles, args.numReads, args.outDir, args.nCPU, uniqueTranscriptGenes)
+        readBams(exons, introns, seqGC, geneGC, geneLen, bamFiles, args.numReads, args.outDir, args.nCPU, uniqueTranscriptGenes)
         args.stage = 'plotStats'
         
     #plot figures
