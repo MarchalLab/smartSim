@@ -40,7 +40,7 @@ install.packages("path/to/smartSim, repos = NULL, type="source")
 * aligned and barcoded Smart-seq3 data similar to the data you want to simulate (alternatively you can use [example_data/aligned](example_data/aligned))
 
 ## Usage
-We provide a tutorial to simulate reads using provided example data [here](https://github.com/pages/MarchalLab/smartSim/tutorial.html).
+We provide a tutorial to simulate reads using provided example data [here](https://marchallab.github.io/smartSim/tutorial.html).
 
 ## Test environment
 The R package was developed and tested using:
