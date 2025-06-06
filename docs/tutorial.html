@@ -405,6 +405,7 @@ display: none;
 environment is activated. This environment is provided at: <a href="https://github.com/MarchalLab/smartSim" class="uri">https://github.com/MarchalLab/smartSim</a>.</p>
 <p>To install smartSim from GitHub, follow the instructions below:</p>
 <pre class="r"><code>library(devtools)
+options(timeout=400) #example datasets can take a while to download
 install_github(&quot;MarchalLab/smartSim&quot;, dependencies = TRUE, repos = BiocManager::repositories())</code></pre>
 <div class="callout-note">
 <p>Alternatively, you may install SmartSim from a local copy using:</p>

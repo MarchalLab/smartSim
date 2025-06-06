@@ -23,8 +23,9 @@ This environment is provided at:  https://github.com/MarchalLab/smartSim.
 
 To install smartSim from GitHub, follow the instructions below:
 
-```{r installGit}
+```{r installGit, results = "hide", warning = FALSE, message = FALSE}
 library(devtools)
+options(timeout=400) #example datasets can take a while to download
 install_github("MarchalLab/smartSim", dependencies = TRUE, repos = BiocManager::repositories())
 ```
 
