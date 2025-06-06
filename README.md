@@ -37,7 +37,7 @@ install.packages("path/to/smartSim, repos = NULL, type="source")
 
 * reference gtf file
 * reference fasta file
-* aligned and barcoded Smart-seq3 data similar to the data you want to simulate (alternatively you can use [example_data/aligned](example_data/aligned))
+* aligned and barcoded Smart-seq3 data similar to the data you want to simulate (alternatively you can use the provided example dataset as described in the [tutorial](https://marchallab.github.io/smartSim/tutorial.html))
 
 ## Usage
 We provide a tutorial to simulate reads using provided example data [here](https://marchallab.github.io/smartSim/tutorial.html).
