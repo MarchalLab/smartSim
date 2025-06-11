@@ -13,7 +13,7 @@ conda activate smartSim
 
 > **Note:** smartSim is currently only available for Linux (linux-64).
 > This limitation is due to its dependency on the HTSeq package, which is not compatible with Windows or macOS.
-> To ensure full functionality for users on Windows or macOS, we recommend running smartSim within a Linux-based virtual machine (VM), such as an Ubuntu VM (e.g. [WSL2](https://learn.microsoft.com/en-us/windows/wsl/about) or [multipass](https://canonical.com/multipass)).
+> To ensure full functionality for users on Windows or macOS, we recommend running smartSim within a Linux-based virtual machine, such as an Ubuntu VM (e.g. [WSL2](https://learn.microsoft.com/en-us/windows/wsl/about) or [multipass](https://canonical.com/multipass)).
 
 ## Installation
 
