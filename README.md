@@ -11,13 +11,9 @@ conda env create -f smartSim_env.yml
 conda activate smartSim
 ```
 
-> **Note:** smartSim is available for Linux (linux-64) and macOS (osx-64).  
-> It is currently not compatible with Windows due to its dependency on HTSeq and Bioconda. 
-> We advise Windows users to install and run smartSim within a Windows Subsystem for Linux (WSL) environment.  
-> Mac users with the osx-arm64 architecture can emulate using the osx-64 subdirectory: hereto they can create the conda environment using : 
-> ```bash
-> CONDA_SUBDIR=osx-64 conda env create -f smartSim_env.yml
-> ```
+> **Note:** smartSim is currently only available for Linux (linux-64).
+> This limitation is due to its dependency on the HTSeq package, which is not compatible with Windows or macOS.
+> To ensure full functionality for users on Windows or macOS, we recommend running smartSim within a Linux-based virtual machine (VM), such as an Ubuntu VM (e.g. [WSL2](https://learn.microsoft.com/en-us/windows/wsl/about) or [multipass](https://canonical.com/multipass)).
 
 ## Installation
 
@@ -52,4 +48,5 @@ The R package was developed and tested using:
   * 256 GB RAM
   * Ubuntu 22.04.4 LTS 
 * session info can be found at: [docs/sessionInfo.txt](docs/sessionInfo.txt)
+
 

@@ -4,6 +4,7 @@ channels:
   - conda-forge
   - defaults
 dependencies:
+  - python=3.12.10
   - htseq=2.0.5
   - scikit-learn=1.6.1
   - statsmodels=0.14.4

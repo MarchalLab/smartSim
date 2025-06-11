@@ -424,9 +424,10 @@ library(R.utils)</code></pre>
 subdirectories to organize the generated data:</p>
 <pre class="r"><code># Define and create the main output directory
 outDir &lt;- &quot;example_data_out&quot;
-dir.create(outDir, recursive = TRUE)
-
-# Define subdirectories
+dir.create(outDir, recursive = TRUE)</code></pre>
+<pre><code>## Warning in dir.create(outDir, recursive = TRUE): &#39;example_data_out&#39; already
+## exists</code></pre>
+<pre class="r"><code># Define subdirectories
 dataCharDir &lt;- file.path(outDir, &quot;dataChar&quot;)
 trueTranscriptDir &lt;- file.path(outDir, &quot;trueTranscripts&quot;)
 readDir &lt;- file.path(outDir, &quot;reads&quot;)</code></pre>
@@ -453,8 +454,12 @@ gtfFile &lt;- file.path(outDir, &quot;chr1.gtf&quot;)
 fastaFile &lt;- file.path(outDir, &quot;chr1.fa&quot;)
 
 # Locate and uncompress the reference files provided with the smartSim package
-gunzip(system.file(&quot;extdata&quot;,&quot;chr1.gtf.gz&quot;, package = &quot;smartSim&quot;), destname = gtfFile, remove = FALSE)
-gunzip(system.file(&quot;extdata&quot;,&quot;chr1.fa.gz&quot;, package = &quot;smartSim&quot;), destname = fastaFile, remove = FALSE)</code></pre>
+if (! file.exists(gtfFile)){
+  gunzip(system.file(&quot;extdata&quot;,&quot;chr1.gtf.gz&quot;, package = &quot;smartSim&quot;), destname = gtfFile, remove = FALSE)
+}
+if (! file.exists(fastaFile)){
+  gunzip(system.file(&quot;extdata&quot;,&quot;chr1.fa.gz&quot;, package = &quot;smartSim&quot;), destname = fastaFile, remove = FALSE)
+}</code></pre>
 </div>
 <div id="input-parameters" class="section level2">
 <h2>Input parameters</h2>

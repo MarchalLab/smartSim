@@ -82,8 +82,12 @@ gtfFile <- file.path(outDir, "chr1.gtf")
 fastaFile <- file.path(outDir, "chr1.fa")
 
 # Locate and uncompress the reference files provided with the smartSim package
-gunzip(system.file("extdata","chr1.gtf.gz", package = "smartSim"), destname = gtfFile, remove = FALSE)
-gunzip(system.file("extdata","chr1.fa.gz", package = "smartSim"), destname = fastaFile, remove = FALSE)
+if (! file.exists(gtfFile)){
+  gunzip(system.file("extdata","chr1.gtf.gz", package = "smartSim"), destname = gtfFile, remove = FALSE)
+}
+if (! file.exists(fastaFile)){
+  gunzip(system.file("extdata","chr1.fa.gz", package = "smartSim"), destname = fastaFile, remove = FALSE)
+}
 ```
 
 ## Input parameters
